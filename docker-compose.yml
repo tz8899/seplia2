@@ -1,0 +1,69 @@
+services:
+  geth:
+    image: ethereum/client-go:stable    # 使用稳定版的以太坊客户端镜像
+    container_name: sepolia-geth        # 容器名称
+    command:
+      - --sepolia                       # 连接到 Sepolia 测试网
+      - --syncmode=snap                 # 使用快照同步模式，同步速度更快
+      - --datadir=/data                 # 数据存储目录
+      - --http                          # 启用 HTTP-RPC 服务
+      - --http.addr=0.0.0.0            # HTTP 服务监听地址，0.0.0.0 表示监听所有网络接口
+      - --http.port=8545               # HTTP 服务端口
+      - --http.api=eth,net,web3,debug,txpool,admin  # 启用的 API 接口
+      - --authrpc.addr=0.0.0.0         # 认证 RPC 服务监听地址
+      - --authrpc.port=8551            # 认证 RPC 服务端口
+      - --authrpc.vhosts=*             # 允许所有虚拟主机访问认证 RPC
+      - --authrpc.jwtsecret=/shared/jwtsecret  # JWT 密钥文件路径
+      - --metrics.expensive            # 启用详细指标收集
+      - --maxpeers=50                  # 最大对等节点连接数
+      - --maxpendpeers=10              # 最大等待连接的对等节点数
+      - --txpool.globalslots=8192      # 全局交易池槽位数量
+      - --txpool.globalqueue=2048      # 全局交易队列大小
+      - --cache=8192                   # 总内存缓存大小（8GB）
+      - --cache.database=4096          # 数据库缓存大小（4GB）
+      - --cache.trie=2048              # trie 缓存大小（2GB）
+      - --cache.gc=25                  # GC 缓存大小
+      - --rpc.allow-unprotected-txs    # 允许未受保护的交易
+      - --rpc.gascap=50000000         # 设置 gas 上限
+      - --rpc.txfeecap=1              # 设置交易费用上限（1 ETH）
+    volumes:
+      - ./execution:/data              # 挂载执行层数据目录
+      - ./shared-data/jwtsecret:/shared/jwtsecret:ro  # 挂载 JWT 密钥文件（只读）
+    ports:
+      - "8545:8545"                    # HTTP-RPC 端口映射
+      - "8551:8551"                    # 认证 RPC 端口映射
+      - "30303:30303"                  # P2P 网络端口映射（TCP）
+      - "30303:30303/udp"              # P2P 网络端口映射（UDP）
+    restart: unless-stopped            # 容器自动重启策略
+    networks:
+      - sepolia-net                    # 连接到自定义网络
+
+  prysm:
+    image: gcr.io/prysmaticlabs/prysm/beacon-chain:latest  # 使用最新版的 Prysm 信标链客户端
+    container_name: sepolia-prysm      # 容器名称
+    command:
+      - --sepolia                      # 连接到 Sepolia 测试网
+      - --datadir=/data                # 数据存储目录
+      - --execution-endpoint=http://geth:8551  # 执行层客户端地址
+      - --jwt-secret=/shared/jwtsecret # JWT 密钥文件路径
+      - --accept-terms-of-use          # 接受使用条款
+      - --http-host=0.0.0.0            # HTTP 服务监听地址
+      - --http-port=3500               # HTTP 服务端口
+      - --http-modules=prysm,eth       # 启用的 API 模块
+      - --checkpoint-sync-url=https://checkpoint-sync.sepolia.ethpandaops.io  # 检查点同步 URL
+    volumes:
+      - ./consensus:/data              # 挂载共识层数据目录
+      - ./shared-data/jwtsecret:/shared/jwtsecret:ro  # 挂载 JWT 密钥文件（只读）
+    ports:
+      - "3500:3500"                    # HTTP API 端口映射
+      - "13000:13000"                  # P2P 网络端口映射（TCP）
+      - "13000:13000/udp"              # P2P 网络端口映射（UDP）
+    restart: unless-stopped            # 容器自动重启策略
+    depends_on:
+      - geth                           # 依赖 geth 服务
+    networks:
+      - sepolia-net                    # 连接到自定义网络
+
+networks:
+  sepolia-net:                         # 自定义网络配置
+    driver: bridge                     # 使用 bridge 网络驱动
