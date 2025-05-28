@@ -1,5 +1,6 @@
 # seplia2
-
+安装docker  这个什么都有 直接用这个代码安装docker
+curl -fsSL https://get.docker.com | sudo sh
 
 第二个备份用
 测试
